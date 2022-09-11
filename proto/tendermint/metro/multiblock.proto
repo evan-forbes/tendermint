@@ -1,0 +1,19 @@
+syntax = "proto3";
+package tendermint.metro;
+
+option go_package = "github.com/tendermint/tendermint/proto/tendermint/metro";
+
+import "gogoproto/gogo.proto";
+import "tendermint/types/types.proto";
+import "tendermint/types/evidence.proto";
+
+message MultiBlock {
+  repeated SimpleBlock blocks = 1 [(gogoproto.nullable) = false];
+  tendermint.types.Commit                        last_commit = 2;
+}
+
+message SimpleBlock {
+  tendermint.types.Header header             = 1 [(gogoproto.nullable) = false];
+  tendermint.types.Data data        = 2 [(gogoproto.nullable) = false];
+  tendermint.types.EvidenceList  evidence    = 3 [(gogoproto.nullable) = false];
+}
