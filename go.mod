@@ -53,6 +53,8 @@ require (
 )
 
 require (
+	github.com/celestiaorg/go-cnc v0.1.0
+	github.com/gorilla/mux v1.7.3
 	github.com/informalsystems/tm-load-test v1.0.0
 	gonum.org/v1/gonum v0.11.0
 	google.golang.org/protobuf v1.28.1
@@ -114,6 +116,7 @@ require (
 	github.com/go-critic/go-critic v0.6.4 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/go-resty/resty/v2 v2.7.0 // indirect
 	github.com/go-toolsmith/astcast v1.0.0 // indirect
 	github.com/go-toolsmith/astcopy v1.0.1 // indirect
 	github.com/go-toolsmith/astequal v1.0.2 // indirect

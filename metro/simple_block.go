@@ -11,7 +11,8 @@ import (
 	"github.com/tendermint/tendermint/types"
 )
 
-// Block defines the atomic unit of a Tendermint blockchain.
+// SimpleBlock is a tendermint Block with the commit removed. A tendermint Block
+// defines the atomic unit of a Tendermint blockchain.
 type SimpleBlock struct {
 	mtx tmsync.Mutex
 
@@ -185,7 +186,7 @@ func (b *SimpleBlock) ToProto() (*metroproto.SimpleBlock, error) {
 
 // FromProto sets a protobuf Block to the given pointer.
 // It returns an error if the block is invalid.
-func BlockFromProto(bp *metroproto.SimpleBlock) (*SimpleBlock, error) {
+func SimpleBlockFromProto(bp *metroproto.SimpleBlock) (*SimpleBlock, error) {
 	if bp == nil {
 		return nil, errors.New("nil block")
 	}

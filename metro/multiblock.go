@@ -4,13 +4,15 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"runtime/debug"
 
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 	metroproto "github.com/tendermint/tendermint/proto/tendermint/metro"
 	"github.com/tendermint/tendermint/types"
 )
 
-// MultiBlock defines the atomic unit of a Tendermint blockchain.
+// MultiBlock represents a chunk of tendermint blocks that can be used to relay
+// and retrieve from an underlying da layer.
 type MultiBlock struct {
 	Blocks     []*SimpleBlock
 	LastCommit *types.Commit `json:"last_commit"`
@@ -25,6 +27,7 @@ func (b *MultiBlock) ValidateBasic() error {
 	}
 
 	if len(b.Blocks) == 0 {
+		fmt.Println("debug", string(debug.Stack()))
 		return errors.New("multiblock must have at least one block")
 	}
 
@@ -98,6 +101,14 @@ func (b *MultiBlock) Size() int {
 	return pbb.Size()
 }
 
+func (b *MultiBlock) MarshalBinary() ([]byte, error) {
+	pb, err := b.ToProto()
+	if err != nil {
+		return nil, err
+	}
+	return pb.Marshal()
+}
+
 // String returns a string representation of the block
 //
 // See StringIndented.
@@ -142,6 +153,16 @@ func MultiBlockFromProto(bp *metroproto.MultiBlock) (*MultiBlock, error) {
 	}
 
 	b := new(MultiBlock)
+
+	sblocks := make([]*SimpleBlock, len(bp.Blocks))
+	for i, sbd := range bp.Blocks {
+		sb, err := SimpleBlockFromProto(&sbd)
+		if err != nil {
+			return nil, err
+		}
+		sblocks[i] = sb
+	}
+	b.Blocks = sblocks
 
 	if bp.LastCommit != nil {
 		lc, err := types.CommitFromProto(bp.LastCommit)

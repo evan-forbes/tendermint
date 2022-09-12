@@ -1,0 +1,51 @@
+syntax = "proto3";
+package dalc;
+option go_package = "github.com/tendermint/tendermint/proto/tendermint/dalc";
+
+import "tendermint/metro/multiblock.proto";
+import "gogoproto/gogo.proto";
+
+enum StatusCode {
+	STATUS_CODE_UNSPECIFIED = 0;
+	STATUS_CODE_SUCCESS = 1;
+	STATUS_CODE_TIMEOUT = 2;
+	STATUS_CODE_ERROR   = 3;
+}
+
+message DAResponse {
+	StatusCode code = 1;
+	string message = 2;
+	int64 da_height = 3 [(gogoproto.customname) = "DAHeight"];
+}
+
+message SubmitBlockRequest {
+	tendermint.metro.MultiBlock block = 1;
+}
+
+message SubmitBlockResponse {
+	DAResponse result = 1;
+}
+
+message CheckBlockAvailabilityRequest {
+	int64 da_height = 1 [(gogoproto.customname) = "DAHeight"];
+}
+
+message CheckBlockAvailabilityResponse {
+	DAResponse result = 1;
+	bool data_available = 2;
+}
+
+message RetrieveBlocksRequest {
+	int64 da_height = 1 [(gogoproto.customname) = "DAHeight"];
+}
+
+message RetrieveBlocksResponse {
+	DAResponse result = 1;
+	repeated tendermint.metro.MultiBlock blocks = 2;
+}
+
+service DALCService {
+	rpc SubmitBlock(SubmitBlockRequest) returns (SubmitBlockResponse) {}
+	rpc CheckBlockAvailability(CheckBlockAvailabilityRequest) returns (CheckBlockAvailabilityResponse) {}
+	rpc RetrieveBlocks(RetrieveBlocksRequest) returns (RetrieveBlocksResponse) {}
+}
