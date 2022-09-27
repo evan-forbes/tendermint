@@ -219,8 +219,6 @@ type Node struct {
 	stateSyncReactor  *statesync.Reactor      // for hosting and restoring state sync snapshots
 	stateSyncProvider statesync.StateProvider // provides state data for bootstrapping a node
 	stateSyncGenesis  sm.State                // provides the genesis state for state sync
-	consensusState    *cs.State               // latest consensus state
-	consensusReactor  *cs.Reactor             // for participating in the consensus
 	pexReactor        *pex.Reactor            // for exchanging peer addresses
 	evidencePool      *evidence.Pool          // tracking evidence
 	proxyApp          proxy.AppConns          // connection to the application
@@ -572,7 +570,6 @@ func createSwitch(config *cfg.Config,
 	mempoolReactor p2p.Reactor,
 	bcReactor p2p.Reactor,
 	stateSyncReactor *statesync.Reactor,
-	consensusReactor *cs.Reactor,
 	evidenceReactor *evidence.Reactor,
 	nodeInfo p2p.NodeInfo,
 	nodeKey *p2p.NodeKey,
@@ -587,7 +584,6 @@ func createSwitch(config *cfg.Config,
 	sw.SetLogger(p2pLogger)
 	sw.AddReactor("MEMPOOL", mempoolReactor)
 	sw.AddReactor("BLOCKCHAIN", bcReactor)
-	sw.AddReactor("CONSENSUS", consensusReactor)
 	sw.AddReactor("EVIDENCE", evidenceReactor)
 	sw.AddReactor("STATESYNC", stateSyncReactor)
 
@@ -647,7 +643,7 @@ func createPEXReactorAndAddToSwitch(addrBook pex.AddrBook, config *cfg.Config,
 }
 
 // startStateSync starts an asynchronous state sync process, then switches to fast sync mode.
-func startStateSync(ssR *statesync.Reactor, bcR fastSyncReactor, conR *cs.Reactor,
+func startStateSync(ssR *statesync.Reactor, bcR fastSyncReactor,
 	stateProvider statesync.StateProvider, config *cfg.StateSyncConfig, fastSync bool,
 	stateStore sm.Store, blockStore *store.BlockStore, state sm.State) error {
 	ssR.Logger.Info("Starting state sync")
@@ -688,15 +684,11 @@ func startStateSync(ssR *statesync.Reactor, bcR fastSyncReactor, conR *cs.Reacto
 
 		if fastSync {
 			// FIXME Very ugly to have these metrics bleed through here.
-			conR.Metrics.StateSyncing.Set(0)
-			conR.Metrics.FastSyncing.Set(1)
 			err = bcR.SwitchToFastSync(state)
 			if err != nil {
 				ssR.Logger.Error("Failed to switch to fast sync", "err", err)
 				return
 			}
-		} else {
-			conR.SwitchToConsensus(state, true)
 		}
 	}()
 	return nil
@@ -827,10 +819,6 @@ func NewNode(config *cfg.Config,
 	} else if fastSync {
 		csMetrics.FastSyncing.Set(1)
 	}
-	consensusReactor, consensusState := createConsensusReactor(
-		config, state, blockExec, blockStore, mempool, evidencePool,
-		privValidator, csMetrics, stateSync || fastSync, eventBus, consensusLogger,
-	)
 
 	// Set up state sync reactor, and schedule a sync if requested.
 	// FIXME The way we do phased startups (e.g. replay -> fast sync -> consensus) is very messy,
@@ -856,7 +844,7 @@ func NewNode(config *cfg.Config,
 	p2pLogger := logger.With("module", "p2p")
 	sw := createSwitch(
 		config, transport, p2pMetrics, peerFilters, mempoolReactor, bcReactor,
-		stateSyncReactor, consensusReactor, evidenceReactor, nodeInfo, nodeKey, p2pLogger,
+		stateSyncReactor, evidenceReactor, nodeInfo, nodeKey, p2pLogger,
 	)
 
 	err = sw.AddPersistentPeers(splitAndTrimEmpty(config.P2P.PersistentPeers, ",", " "))
@@ -913,8 +901,6 @@ func NewNode(config *cfg.Config,
 		bcReactor:        bcReactor,
 		mempoolReactor:   mempoolReactor,
 		mempool:          mempool,
-		consensusState:   consensusState,
-		consensusReactor: consensusReactor,
 		stateSyncReactor: stateSyncReactor,
 		stateSync:        stateSync,
 		stateSyncGenesis: state, // Shouldn't be necessary, but need a way to pass the genesis state
@@ -991,7 +977,7 @@ func (n *Node) OnStart() error {
 		if !ok {
 			return fmt.Errorf("this blockchain reactor does not support switching from state sync")
 		}
-		err := startStateSync(n.stateSyncReactor, bcR, n.consensusReactor, n.stateSyncProvider,
+		err := startStateSync(n.stateSyncReactor, bcR, n.stateSyncProvider,
 			n.config.StateSync, n.config.FastSyncMode, n.stateStore, n.blockStore, n.stateSyncGenesis)
 		if err != nil {
 			return fmt.Errorf("failed to start state sync: %w", err)
@@ -1058,19 +1044,17 @@ func (n *Node) ConfigureRPC() error {
 		ProxyAppQuery:   n.proxyApp.Query(),
 		ProxyAppMempool: n.proxyApp.Mempool(),
 
-		StateStore:     n.stateStore,
-		BlockStore:     n.blockStore,
-		EvidencePool:   n.evidencePool,
-		ConsensusState: n.consensusState,
-		P2PPeers:       n.sw,
-		P2PTransport:   n,
+		StateStore:   n.stateStore,
+		BlockStore:   n.blockStore,
+		EvidencePool: n.evidencePool,
+		P2PPeers:     n.sw,
+		P2PTransport: n,
 
-		GenDoc:           n.genesisDoc,
-		TxIndexer:        n.txIndexer,
-		BlockIndexer:     n.blockIndexer,
-		ConsensusReactor: n.consensusReactor,
-		EventBus:         n.eventBus,
-		Mempool:          n.mempool,
+		GenDoc:       n.genesisDoc,
+		TxIndexer:    n.txIndexer,
+		BlockIndexer: n.blockIndexer,
+		EventBus:     n.eventBus,
+		Mempool:      n.mempool,
 
 		Logger: n.Logger.With("module", "rpc"),
 
@@ -1232,16 +1216,6 @@ func (n *Node) Switch() *p2p.Switch {
 // BlockStore returns the Node's BlockStore.
 func (n *Node) BlockStore() *store.BlockStore {
 	return n.blockStore
-}
-
-// ConsensusState returns the Node's ConsensusState.
-func (n *Node) ConsensusState() *cs.State {
-	return n.consensusState
-}
-
-// ConsensusReactor returns the Node's ConsensusReactor.
-func (n *Node) ConsensusReactor() *cs.Reactor {
-	return n.consensusReactor
 }
 
 // MempoolReactor returns the Node's mempool reactor.
