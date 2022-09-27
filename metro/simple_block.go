@@ -208,3 +208,11 @@ func SimpleBlockFromProto(bp *metroproto.SimpleBlock) (*SimpleBlock, error) {
 
 	return b, b.ValidateBasic()
 }
+
+func SimpleBlockFromNormalBlock(b *types.Block) SimpleBlock {
+	return SimpleBlock{
+		Header:   b.Header,
+		Data:     b.Data,
+		Evidence: b.Evidence,
+	}
+}
