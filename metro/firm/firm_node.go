@@ -461,39 +461,6 @@ func createBlockchainReactor(config *cfg.Config,
 	return bcReactor, nil
 }
 
-func createConsensusReactor(config *cfg.Config,
-	state sm.State,
-	blockExec *sm.BlockExecutor,
-	blockStore sm.BlockStore,
-	mempool mempl.Mempool,
-	evidencePool *evidence.Pool,
-	privValidator types.PrivValidator,
-	csMetrics *cs.Metrics,
-	waitSync bool,
-	eventBus *types.EventBus,
-	consensusLogger log.Logger) (*cs.Reactor, *cs.State) {
-
-	consensusState := cs.NewState(
-		config.Consensus,
-		state.Copy(),
-		blockExec,
-		blockStore,
-		mempool,
-		evidencePool,
-		cs.StateMetrics(csMetrics),
-	)
-	consensusState.SetLogger(consensusLogger)
-	if privValidator != nil {
-		consensusState.SetPrivValidator(privValidator)
-	}
-	consensusReactor := cs.NewReactor(consensusState, waitSync, cs.ReactorMetrics(csMetrics))
-	consensusReactor.SetLogger(consensusLogger)
-	// services which will be publishing and/or subscribing for messages (events)
-	// consensusReactor will set it on consensusState and blockExecutor
-	consensusReactor.SetEventBus(eventBus)
-	return consensusReactor, consensusState
-}
-
 func createTransport(
 	config *cfg.Config,
 	nodeInfo p2p.NodeInfo,
