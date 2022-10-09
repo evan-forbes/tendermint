@@ -1,7 +1,6 @@
 package mock
 
 import (
-	"fmt"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -79,8 +78,6 @@ func (m *DataAvailabilityLayerClient) SubmitBlock(block *types.Block) da.ResultS
 	m.blocks[m.daHeight] = append(m.blocks[m.daHeight], block)
 	m.mut.Unlock()
 
-	fmt.Println("submitted rollups block", daHeight)
-
 	return da.ResultSubmitBlock{
 		BaseResult: da.BaseResult{
 			Code:     da.StatusSuccess,
@@ -106,11 +103,6 @@ func (m *DataAvailabilityLayerClient) RetrieveBlocks(daHeight uint64) da.ResultR
 	m.mut.Lock()
 	blocks = m.blocks[daHeight]
 	m.mut.Unlock()
-
-	fmt.Println("retrieved blocks just fine", len(blocks))
-	if len(blocks) != 0 {
-		fmt.Println("no blocks found for height", daHeight)
-	}
 
 	return da.ResultRetrieveBlocks{BaseResult: da.BaseResult{Code: da.StatusSuccess}, Blocks: blocks}
 }

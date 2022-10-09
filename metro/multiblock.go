@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"runtime/debug"
 
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 	metroproto "github.com/tendermint/tendermint/proto/tendermint/metro"
@@ -27,7 +26,6 @@ func (b *MultiBlock) ValidateBasic() error {
 	}
 
 	if len(b.Blocks) == 0 {
-		fmt.Println("debug", string(debug.Stack()))
 		return errors.New("multiblock must have at least one block")
 	}
 

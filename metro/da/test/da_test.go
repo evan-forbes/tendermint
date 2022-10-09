@@ -2,7 +2,6 @@ package test
 
 import (
 	"encoding/json"
-	"fmt"
 	"math/rand"
 	"net"
 	"strconv"
@@ -134,10 +133,6 @@ func TestRetrieve(t *testing.T) {
 
 	for _, client := range registry.RegisteredClients() {
 		t.Run(client, func(t *testing.T) {
-			if client != "mock" {
-				return
-			}
-			fmt.Println("RUNNING TEST WITH CLIENT", client)
 			dalc := registry.GetClient(client)
 			_, ok := dalc.(da.BlockRetriever)
 			if ok {
@@ -205,7 +200,7 @@ func doTestRetrieve(t *testing.T, dalc da.DataAvailabilityLayerClient) {
 	countAtHeight := make(map[uint64]int)
 	blocks := make(map[*types.Block]uint64)
 
-	for i := uint64(0); i < 3; i++ {
+	for i := uint64(1); i < 100; i++ {
 		b := getRandomBlock(i, rand.Int()%20)
 		resp := dalc.SubmitBlock(b)
 		require.Equal(da.StatusSuccess, resp.Code, resp.Message)
@@ -230,7 +225,13 @@ func doTestRetrieve(t *testing.T, dalc da.DataAvailabilityLayerClient) {
 		ret := retriever.RetrieveBlocks(h)
 		assert.Equal(da.StatusSuccess, ret.Code, h)
 		require.NotEmpty(ret.Blocks, h)
-		assert.Contains(ret.Blocks, b, h)
+		containCheck := make(map[string]struct{})
+		for _, rb := range ret.Blocks {
+			hash := rb.Hash()
+			containCheck[string(hash)] = struct{}{}
+		}
+		_, has := containCheck[string(b.Hash())]
+		assert.True(has)
 	}
 }
 
