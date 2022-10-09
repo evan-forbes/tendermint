@@ -17,7 +17,6 @@ import (
 	"github.com/tendermint/tendermint/metro"
 	"github.com/tendermint/tendermint/metro/da"
 	mockda "github.com/tendermint/tendermint/metro/da/mock"
-	metroproto "github.com/tendermint/tendermint/proto/tendermint/metro"
 )
 
 // Server mocks celestia-node HTTP API.
@@ -80,24 +79,18 @@ func (s *Server) submit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pmblock := metroproto.MultiBlock{}
 	blockData, err := hex.DecodeString(req.Data)
 	if err != nil {
 		s.writeError(w, err)
 		return
 	}
-	err = pmblock.Unmarshal(blockData)
-	if err != nil {
-		s.writeError(w, err)
-		return
-	}
-	mblock, err := metro.MultiBlockFromProto(&pmblock)
+	block, err := metro.UnmarshalBlock(blockData)
 	if err != nil {
 		s.writeError(w, err)
 		return
 	}
 
-	res := s.mock.SubmitMultiBlock(mblock)
+	res := s.mock.SubmitBlock(block)
 	code := 0
 	if res.Code != da.StatusSuccess {
 		code = 3
@@ -123,7 +116,7 @@ func (s *Server) shares(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res := s.mock.RetrieveBlocks(int64(height))
+	res := s.mock.RetrieveBlocks(height)
 	if res.Code != da.StatusSuccess {
 		s.writeError(w, errors.New(res.Message))
 		return
@@ -131,7 +124,7 @@ func (s *Server) shares(w http.ResponseWriter, r *http.Request) {
 
 	var nShares []NamespacedShare
 	for _, block := range res.Blocks {
-		blob, err := block.MarshalBinary()
+		blob, err := metro.MarshalBlock(block)
 		if err != nil {
 			s.writeError(w, err)
 			return
@@ -149,7 +142,7 @@ func (s *Server) shares(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := json.Marshal(namespacedSharesResponse{
 		Shares: shares,
-		Height: uint64(res.DAHeight),
+		Height: res.DAHeight,
 	})
 	if err != nil {
 		s.writeError(w, err)
@@ -166,7 +159,7 @@ func (s *Server) data(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res := s.mock.RetrieveBlocks(int64(height))
+	res := s.mock.RetrieveBlocks(height)
 	if res.Code != da.StatusSuccess {
 		s.writeError(w, errors.New(res.Message))
 		return
@@ -174,7 +167,7 @@ func (s *Server) data(w http.ResponseWriter, r *http.Request) {
 
 	data := make([][]byte, len(res.Blocks))
 	for i := range res.Blocks {
-		data[i], err = res.Blocks[i].MarshalBinary()
+		data[i], err = metro.MarshalBlock(res.Blocks[i])
 		if err != nil {
 			s.writeError(w, err)
 			return
@@ -183,7 +176,7 @@ func (s *Server) data(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := json.Marshal(namespacedDataResponse{
 		Data:   data,
-		Height: uint64(res.DAHeight),
+		Height: res.DAHeight,
 	})
 	if err != nil {
 		s.writeError(w, err)

@@ -2,7 +2,7 @@ syntax = "proto3";
 package dalc;
 option go_package = "github.com/tendermint/tendermint/proto/tendermint/dalc";
 
-import "tendermint/metro/multiblock.proto";
+import "tendermint/types/block.proto";
 import "gogoproto/gogo.proto";
 
 enum StatusCode {
@@ -15,11 +15,11 @@ enum StatusCode {
 message DAResponse {
 	StatusCode code = 1;
 	string message = 2;
-	int64 da_height = 3 [(gogoproto.customname) = "DAHeight"];
+	uint64 da_height = 3 [(gogoproto.customname) = "DAHeight"];
 }
 
 message SubmitBlockRequest {
-	tendermint.metro.MultiBlock block = 1;
+	tendermint.types.Block block = 1;
 }
 
 message SubmitBlockResponse {
@@ -27,7 +27,7 @@ message SubmitBlockResponse {
 }
 
 message CheckBlockAvailabilityRequest {
-	int64 da_height = 1 [(gogoproto.customname) = "DAHeight"];
+	uint64 da_height = 1 [(gogoproto.customname) = "DAHeight"];
 }
 
 message CheckBlockAvailabilityResponse {
@@ -36,12 +36,12 @@ message CheckBlockAvailabilityResponse {
 }
 
 message RetrieveBlocksRequest {
-	int64 da_height = 1 [(gogoproto.customname) = "DAHeight"];
+	uint64 da_height = 1 [(gogoproto.customname) = "DAHeight"];
 }
 
 message RetrieveBlocksResponse {
 	DAResponse result = 1;
-	repeated tendermint.metro.MultiBlock blocks = 2;
+	repeated tendermint.types.Block blocks = 2;
 }
 
 service DALCService {

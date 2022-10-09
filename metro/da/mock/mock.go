@@ -1,26 +1,26 @@
 package mock
 
 import (
-	"encoding/binary"
+	"fmt"
 	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/tendermint/tendermint/libs/log"
-	"github.com/tendermint/tendermint/metro"
 	"github.com/tendermint/tendermint/metro/da"
+	"github.com/tendermint/tendermint/types"
 )
 
 // DataAvailabilityLayerClient is intended only for usage in tests.
 // It does actually ensures DA - it stores data in-memory.
 type DataAvailabilityLayerClient struct {
 	logger   log.Logger
-	daHeight int64
+	daHeight uint64
 	config   config
 
-	mtx     *sync.Mutex
-	mblocks map[int64][]*metro.MultiBlock
+	mut    *sync.Mutex
+	blocks map[uint64][]*types.Block
 }
 
 const defaultBlockTime = 3 * time.Second
@@ -34,7 +34,9 @@ var _ da.BlockRetriever = &DataAvailabilityLayerClient{}
 
 // Init is called once to allow DA client to read configuration and initialize resources.
 func (m *DataAvailabilityLayerClient) Init(_ [8]byte, config []byte, logger log.Logger) error {
+	m.mut = &sync.Mutex{}
 	m.logger = logger
+	m.blocks = make(map[uint64][]*types.Block)
 	m.daHeight = 1
 	if len(config) > 0 {
 		var err error
@@ -45,8 +47,6 @@ func (m *DataAvailabilityLayerClient) Init(_ [8]byte, config []byte, logger log.
 	} else {
 		m.config.BlockTime = defaultBlockTime
 	}
-	m.mtx = &sync.Mutex{}
-	m.mblocks = make(map[int64][]*metro.MultiBlock)
 	return nil
 }
 
@@ -71,28 +71,15 @@ func (m *DataAvailabilityLayerClient) Stop() error {
 // SubmitBlock submits the passed in block to the DA layer.
 // This should create a transaction which (potentially)
 // triggers a state transition in the DA layer.
-func (m *DataAvailabilityLayerClient) SubmitMultiBlock(mblock *metro.MultiBlock) da.ResultSubmitBlock {
-	daHeight := atomic.LoadInt64(&m.daHeight)
-	if len(mblock.Blocks) == 0 {
-		return da.ResultSubmitBlock{BaseResult: da.BaseResult{Code: da.StatusError, Message: "multi block must have at least one block"}}
-	}
+func (m *DataAvailabilityLayerClient) SubmitBlock(block *types.Block) da.ResultSubmitBlock {
+	daHeight := atomic.LoadUint64(&m.daHeight)
+	m.logger.Debug("Submitting block to DA layer!", "height", block.Header.Height, "dataLayerHeight", daHeight)
 
-	lastBlock := mblock.Blocks[len(mblock.Blocks)-1]
-	m.logger.Debug("Submitting block to DA layer!", "height", lastBlock.Header.Height, "dataLayerHeight", daHeight)
+	m.mut.Lock()
+	m.blocks[m.daHeight] = append(m.blocks[m.daHeight], block)
+	m.mut.Unlock()
 
-	m.mtx.Lock()
-	m.mblocks[daHeight] = append(m.mblocks[daHeight], mblock)
-	m.mtx.Unlock()
-
-	// pmblock, err := mblock.ToProto()
-	// if err != nil {
-	// 	return da.ResultSubmitBlock{BaseResult: da.BaseResult{Code: da.StatusError, Message: err.Error()}}
-	// }
-
-	// blob, err := proto.Marshal(pmblock)
-	// if err != nil {
-	// 	return da.ResultSubmitBlock{BaseResult: da.BaseResult{Code: da.StatusError, Message: err.Error()}}
-	// }
+	fmt.Println("submitted rollups block", daHeight)
 
 	return da.ResultSubmitBlock{
 		BaseResult: da.BaseResult{
@@ -104,41 +91,31 @@ func (m *DataAvailabilityLayerClient) SubmitMultiBlock(mblock *metro.MultiBlock)
 }
 
 // CheckBlockAvailability queries DA layer to check data availability of block corresponding to given header.
-func (m *DataAvailabilityLayerClient) CheckBlockAvailability(daHeight int64) da.ResultCheckBlock {
-	return da.ResultCheckBlock{BaseResult: da.BaseResult{Code: da.StatusSuccess}, DataAvailable: true}
+func (m *DataAvailabilityLayerClient) CheckBlockAvailability(daHeight uint64) da.ResultCheckBlock {
+	blocksRes := m.RetrieveBlocks(daHeight)
+	return da.ResultCheckBlock{BaseResult: da.BaseResult{Code: blocksRes.Code}, DataAvailable: len(blocksRes.Blocks) > 0}
 }
 
 // RetrieveBlocks returns block at given height from data availability layer.
-func (m *DataAvailabilityLayerClient) RetrieveBlocks(daHeight int64) da.ResultRetrieveBlocks {
-	if daHeight >= atomic.LoadInt64(&m.daHeight) {
+func (m *DataAvailabilityLayerClient) RetrieveBlocks(daHeight uint64) da.ResultRetrieveBlocks {
+	if daHeight >= atomic.LoadUint64(&m.daHeight) {
 		return da.ResultRetrieveBlocks{BaseResult: da.BaseResult{Code: da.StatusError, Message: "block not found"}}
 	}
 
-	m.mtx.Lock()
-	mblocks, has := m.mblocks[daHeight]
-	m.mtx.Unlock()
+	var blocks []*types.Block
+	m.mut.Lock()
+	blocks = m.blocks[daHeight]
+	m.mut.Unlock()
 
-	if !has {
-		return da.ResultRetrieveBlocks{BaseResult: da.BaseResult{Code: da.StatusError, Message: "no blocks found at height"}}
+	fmt.Println("retrieved blocks just fine", len(blocks))
+	if len(blocks) != 0 {
+		fmt.Println("no blocks found for height", daHeight)
 	}
 
-	return da.ResultRetrieveBlocks{BaseResult: da.BaseResult{Code: da.StatusSuccess}, Blocks: mblocks}
-}
-
-func getPrefix(daHeight uint64) []byte {
-	b := make([]byte, 8)
-	binary.BigEndian.PutUint64(b, daHeight)
-	return b
-}
-
-func getKey(daHeight uint64, height uint64) []byte {
-	b := make([]byte, 16)
-	binary.BigEndian.PutUint64(b, daHeight)
-	binary.BigEndian.PutUint64(b[8:], height)
-	return b
+	return da.ResultRetrieveBlocks{BaseResult: da.BaseResult{Code: da.StatusSuccess}, Blocks: blocks}
 }
 
 func (m *DataAvailabilityLayerClient) updateDAHeight() {
 	blockStep := rand.Uint64()%10 + 1
-	atomic.AddInt64(&m.daHeight, int64(blockStep))
+	atomic.AddUint64(&m.daHeight, blockStep)
 }

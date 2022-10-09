@@ -8,9 +8,9 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/tendermint/tendermint/libs/log"
-	"github.com/tendermint/tendermint/metro"
 	"github.com/tendermint/tendermint/metro/da"
 	"github.com/tendermint/tendermint/proto/tendermint/dalc"
+	"github.com/tendermint/tendermint/types"
 )
 
 // DataAvailabilityLayerClient is a generic client that proxies all DA requests via gRPC.
@@ -73,14 +73,14 @@ func (d *DataAvailabilityLayerClient) Stop() error {
 }
 
 // SubmitBlock proxies SubmitBlock request to gRPC server.
-func (d *DataAvailabilityLayerClient) SubmitMultiBlock(mblock *metro.MultiBlock) da.ResultSubmitBlock {
-	pblock, err := mblock.ToProto()
+func (d *DataAvailabilityLayerClient) SubmitBlock(block *types.Block) da.ResultSubmitBlock {
+	pb, err := block.ToProto()
 	if err != nil {
 		return da.ResultSubmitBlock{
 			BaseResult: da.BaseResult{Code: da.StatusError, Message: err.Error()},
 		}
 	}
-	resp, err := d.client.SubmitBlock(context.TODO(), &dalc.SubmitBlockRequest{Block: pblock})
+	resp, err := d.client.SubmitBlock(context.TODO(), &dalc.SubmitBlockRequest{Block: pb})
 	if err != nil {
 		return da.ResultSubmitBlock{
 			BaseResult: da.BaseResult{Code: da.StatusError, Message: err.Error()},
@@ -96,7 +96,7 @@ func (d *DataAvailabilityLayerClient) SubmitMultiBlock(mblock *metro.MultiBlock)
 }
 
 // CheckBlockAvailability proxies CheckBlockAvailability request to gRPC server.
-func (d *DataAvailabilityLayerClient) CheckBlockAvailability(daHeight int64) da.ResultCheckBlock {
+func (d *DataAvailabilityLayerClient) CheckBlockAvailability(daHeight uint64) da.ResultCheckBlock {
 	resp, err := d.client.CheckBlockAvailability(context.TODO(), &dalc.CheckBlockAvailabilityRequest{DAHeight: daHeight})
 	if err != nil {
 		return da.ResultCheckBlock{BaseResult: da.BaseResult{Code: da.StatusError, Message: err.Error()}}
@@ -108,19 +108,19 @@ func (d *DataAvailabilityLayerClient) CheckBlockAvailability(daHeight int64) da.
 }
 
 // RetrieveBlocks proxies RetrieveBlocks request to gRPC server.
-func (d *DataAvailabilityLayerClient) RetrieveBlocks(daHeight int64) da.ResultRetrieveBlocks {
+func (d *DataAvailabilityLayerClient) RetrieveBlocks(daHeight uint64) da.ResultRetrieveBlocks {
 	resp, err := d.client.RetrieveBlocks(context.TODO(), &dalc.RetrieveBlocksRequest{DAHeight: daHeight})
 	if err != nil {
 		return da.ResultRetrieveBlocks{BaseResult: da.BaseResult{Code: da.StatusError, Message: err.Error()}}
 	}
 
-	blocks := make([]*metro.MultiBlock, len(resp.Blocks))
+	blocks := make([]*types.Block, len(resp.Blocks))
 	for i, block := range resp.Blocks {
-		mblock, err := metro.MultiBlockFromProto(block)
+		b, err := types.BlockFromProto(block)
 		if err != nil {
 			return da.ResultRetrieveBlocks{BaseResult: da.BaseResult{Code: da.StatusError, Message: err.Error()}}
 		}
-		blocks[i] = mblock
+		blocks[i] = b
 	}
 	return da.ResultRetrieveBlocks{
 		BaseResult: da.BaseResult{

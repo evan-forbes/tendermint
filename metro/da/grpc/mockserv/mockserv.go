@@ -2,17 +2,16 @@ package mockserv
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	"github.com/tendermint/tendermint/metro"
 	"google.golang.org/grpc"
 
 	grpcda "github.com/tendermint/tendermint/metro/da/grpc"
 	"github.com/tendermint/tendermint/metro/da/mock"
 	"github.com/tendermint/tendermint/proto/tendermint/dalc"
-	metroproto "github.com/tendermint/tendermint/proto/tendermint/metro"
+	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
+	"github.com/tendermint/tendermint/types"
 )
 
 // GetServer creates and returns gRPC server instance.
@@ -40,13 +39,11 @@ type mockImpl struct {
 }
 
 func (m *mockImpl) SubmitBlock(_ context.Context, request *dalc.SubmitBlockRequest) (*dalc.SubmitBlockResponse, error) {
-	fmt.Println("---------------------------------- mock multi len", len(request.Block.Blocks))
-	mblock, err := metro.MultiBlockFromProto(request.Block)
+	b, err := types.BlockFromProto(request.Block)
 	if err != nil {
-		fmt.Println("errrrrrrrrrrrrrrrrrr", err)
 		return nil, err
 	}
-	resp := m.mock.SubmitMultiBlock(mblock)
+	resp := m.mock.SubmitBlock(b)
 	return &dalc.SubmitBlockResponse{
 		Result: &dalc.DAResponse{
 			Code:     dalc.StatusCode(resp.Code),
@@ -69,13 +66,13 @@ func (m *mockImpl) CheckBlockAvailability(_ context.Context, request *dalc.Check
 
 func (m *mockImpl) RetrieveBlocks(context context.Context, request *dalc.RetrieveBlocksRequest) (*dalc.RetrieveBlocksResponse, error) {
 	resp := m.mock.RetrieveBlocks(request.DAHeight)
-	blocks := make([]*metroproto.MultiBlock, len(resp.Blocks))
-	for i := range resp.Blocks {
-		pmblock, err := resp.Blocks[i].ToProto()
+	blocks := make([]*tmproto.Block, len(resp.Blocks))
+	for i, b := range resp.Blocks {
+		tB, err := b.ToProto()
 		if err != nil {
 			return nil, err
 		}
-		blocks[i] = pmblock
+		blocks[i] = tB
 	}
 	return &dalc.RetrieveBlocksResponse{
 		Result: &dalc.DAResponse{

@@ -8,11 +8,12 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 
-	cnc "github.com/celestiaorg/go-cnc"
+	"github.com/celestiaorg/go-cnc"
 	"github.com/tendermint/tendermint/libs/log"
 	"github.com/tendermint/tendermint/metro"
 	"github.com/tendermint/tendermint/metro/da"
-	metroproto "github.com/tendermint/tendermint/proto/tendermint/metro"
+	pb "github.com/tendermint/tendermint/proto/tendermint/types"
+	"github.com/tendermint/tendermint/types"
 )
 
 // DataAvailabilityLayerClient use celestia-node public API.
@@ -61,17 +62,8 @@ func (c *DataAvailabilityLayerClient) Stop() error {
 }
 
 // SubmitBlock submits a block to DA layer.
-func (c *DataAvailabilityLayerClient) SubmitMultiBlock(mblock *metro.MultiBlock) da.ResultSubmitBlock {
-	pmblock, err := mblock.ToProto()
-	if err != nil {
-		return da.ResultSubmitBlock{
-			BaseResult: da.BaseResult{
-				Code:    da.StatusError,
-				Message: err.Error(),
-			},
-		}
-	}
-	blob, err := proto.Marshal(pmblock)
+func (c *DataAvailabilityLayerClient) SubmitBlock(block *types.Block) da.ResultSubmitBlock {
+	blob, err := metro.MarshalBlock(block)
 	if err != nil {
 		return da.ResultSubmitBlock{
 			BaseResult: da.BaseResult{
@@ -82,6 +74,7 @@ func (c *DataAvailabilityLayerClient) SubmitMultiBlock(mblock *metro.MultiBlock)
 	}
 
 	txResponse, err := c.client.SubmitPFD(context.TODO(), c.namespaceID, blob, c.config.GasLimit)
+
 	if err != nil {
 		return da.ResultSubmitBlock{
 			BaseResult: da.BaseResult{
@@ -104,14 +97,14 @@ func (c *DataAvailabilityLayerClient) SubmitMultiBlock(mblock *metro.MultiBlock)
 		BaseResult: da.BaseResult{
 			Code:     da.StatusSuccess,
 			Message:  "tx hash: " + txResponse.TxHash,
-			DAHeight: int64(txResponse.Height),
+			DAHeight: uint64(txResponse.Height),
 		},
 	}
 }
 
 // CheckBlockAvailability queries DA layer to check data availability of block at given height.
-func (c *DataAvailabilityLayerClient) CheckBlockAvailability(dataLayerHeight int64) da.ResultCheckBlock {
-	shares, err := c.client.NamespacedShares(context.TODO(), c.namespaceID, uint64(dataLayerHeight))
+func (c *DataAvailabilityLayerClient) CheckBlockAvailability(dataLayerHeight uint64) da.ResultCheckBlock {
+	shares, err := c.client.NamespacedShares(context.TODO(), c.namespaceID, dataLayerHeight)
 	if err != nil {
 		return da.ResultCheckBlock{
 			BaseResult: da.BaseResult{
@@ -131,8 +124,8 @@ func (c *DataAvailabilityLayerClient) CheckBlockAvailability(dataLayerHeight int
 }
 
 // RetrieveBlocks gets a batch of blocks from DA layer.
-func (c *DataAvailabilityLayerClient) RetrieveBlocks(dataLayerHeight int64) da.ResultRetrieveBlocks {
-	data, err := c.client.NamespacedData(context.TODO(), c.namespaceID, uint64(dataLayerHeight))
+func (c *DataAvailabilityLayerClient) RetrieveBlocks(dataLayerHeight uint64) da.ResultRetrieveBlocks {
+	data, err := c.client.NamespacedData(context.TODO(), c.namespaceID, dataLayerHeight)
 	if err != nil {
 		return da.ResultRetrieveBlocks{
 			BaseResult: da.BaseResult{
@@ -142,16 +135,16 @@ func (c *DataAvailabilityLayerClient) RetrieveBlocks(dataLayerHeight int64) da.R
 		}
 	}
 
-	blocks := make([]*metro.MultiBlock, len(data))
+	blocks := make([]*types.Block, len(data))
 	for i, msg := range data {
-		var pmblock metroproto.MultiBlock
-		err = proto.Unmarshal(msg, &pmblock)
+		var block pb.Block
+		err = proto.Unmarshal(msg, &block)
 		if err != nil {
 			c.logger.Error("failed to unmarshal block", "daHeight", dataLayerHeight, "position", i, "error", err)
 			continue
 		}
 
-		mblock, err := metro.MultiBlockFromProto(&pmblock)
+		b, err := types.BlockFromProto(&block)
 		if err != nil {
 			return da.ResultRetrieveBlocks{
 				BaseResult: da.BaseResult{
@@ -160,7 +153,7 @@ func (c *DataAvailabilityLayerClient) RetrieveBlocks(dataLayerHeight int64) da.R
 				},
 			}
 		}
-		blocks[i] = mblock
+		blocks[i] = b
 	}
 
 	return da.ResultRetrieveBlocks{

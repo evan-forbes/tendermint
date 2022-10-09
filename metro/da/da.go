@@ -2,12 +2,12 @@ package da
 
 import (
 	"github.com/tendermint/tendermint/libs/log"
-	"github.com/tendermint/tendermint/metro"
+	"github.com/tendermint/tendermint/types"
 )
 
 // StatusCode is a type for DA layer return status.
 // TODO: define an enum of different non-happy-path cases
-// that might need to be handled by Optimint independent of
+// that might need to be handled by rollmint independent of
 // the underlying DA chain.
 type StatusCode uint64
 
@@ -26,14 +26,14 @@ type BaseResult struct {
 	// Message may contain DA layer specific information (like DA block height/hash, detailed error message, etc)
 	Message string
 	// DAHeight informs about a height on Data Availability Layer for given result.
-	DAHeight int64
+	DAHeight uint64
 }
 
 // ResultSubmitBlock contains information returned from DA layer after block submission.
 type ResultSubmitBlock struct {
 	BaseResult
 	// Not sure if this needs to be bubbled up to other
-	// parts of Optimint.
+	// parts of rollmint.
 	// Hash hash.Hash
 }
 
@@ -50,7 +50,7 @@ type ResultRetrieveBlocks struct {
 	BaseResult
 	// Block is the full block retrieved from Data Availability Layer.
 	// If Code is not equal to StatusSuccess, it has to be nil.
-	Blocks []*metro.MultiBlock
+	Blocks []*types.Block
 }
 
 // DataAvailabilityLayerClient defines generic interface for DA layer block submission.
@@ -68,15 +68,15 @@ type DataAvailabilityLayerClient interface {
 	// SubmitBlock submits the passed in block to the DA layer.
 	// This should create a transaction which (potentially)
 	// triggers a state transition in the DA layer.
-	SubmitMultiBlock(mblock *metro.MultiBlock) ResultSubmitBlock
+	SubmitBlock(block *types.Block) ResultSubmitBlock
 
 	// CheckBlockAvailability queries DA layer to check data availability of block corresponding at given height.
-	CheckBlockAvailability(dataLayerHeight int64) ResultCheckBlock
+	CheckBlockAvailability(dataLayerHeight uint64) ResultCheckBlock
 }
 
 // BlockRetriever is additional interface that can be implemented by Data Availability Layer Client that is able to retrieve
 // block data from DA layer. This gives the ability to use it for block synchronization.
 type BlockRetriever interface {
 	// RetrieveBlocks returns blocks at given data layer height from data availability layer.
-	RetrieveBlocks(dataLayerHeight int64) ResultRetrieveBlocks
+	RetrieveBlocks(dataLayerHeight uint64) ResultRetrieveBlocks
 }
