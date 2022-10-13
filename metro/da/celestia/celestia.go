@@ -35,6 +35,22 @@ type Config struct {
 	GasLimit uint64        `json:"gas_limit"`
 }
 
+func DefaultConfig() Config {
+	return Config{
+		BaseURL:  "http://localhost:26658",
+		Timeout:  30 * time.Second,
+		GasLimit: 3000000,
+	}
+}
+
+func (c Config) Marshal() []byte {
+	bz, err := json.Marshal(c)
+	if err != nil {
+		panic(err)
+	}
+	return bz
+}
+
 // Init initializes DataAvailabilityLayerClient instance.
 func (c *DataAvailabilityLayerClient) Init(namespaceID [8]byte, config []byte, logger log.Logger) error {
 	c.namespaceID = namespaceID

@@ -23,8 +23,8 @@ type Retriever struct {
 
 	Blocks chan *types.Block
 
-	mut                         *sync.Mutex
-	DALayerHeight, RollupHeight int64
+	mut           *sync.Mutex
+	dALayerHeight int64
 }
 
 func NewRetriever(cfg Config, dalc da.BlockRetriever, logger log.Logger) *Retriever {
@@ -34,8 +34,7 @@ func NewRetriever(cfg Config, dalc da.BlockRetriever, logger log.Logger) *Retrie
 		Blocks:        blocks,
 		mut:           &sync.Mutex{},
 		dalc:          dalc,
-		DALayerHeight: cfg.DAStartHeight,
-		RollupHeight:  0,
+		dALayerHeight: cfg.DAStartHeight,
 		logger:        logger,
 	}
 }
@@ -62,7 +61,7 @@ func (r *Retriever) sync(ctx context.Context) {
 				r.Blocks <- b
 			}
 			r.mut.Lock()
-			r.DALayerHeight++
+			r.dALayerHeight++
 			r.mut.Unlock()
 
 		}
@@ -70,7 +69,7 @@ func (r *Retriever) sync(ctx context.Context) {
 }
 
 func (r *Retriever) fetchNextBlocks(retryTime time.Duration) []*types.Block {
-	res := r.dalc.RetrieveBlocks(uint64(r.DALayerHeight))
+	res := r.dalc.RetrieveBlocks(uint64(r.dALayerHeight))
 	if res.Code != da.StatusSuccess {
 		r.logger.Error("failure to retrieve block", "err", res.Message)
 		time.Sleep(retryTime)
