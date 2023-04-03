@@ -145,7 +145,7 @@ func (conR *Reactor) GetChannels() []*p2p.ChannelDescriptor {
 		{
 			ID:                  StateChannel,
 			Priority:            6,
-			SendQueueCapacity:   100,
+			SendQueueCapacity:   10000,
 			RecvMessageCapacity: maxMsgSize,
 			MessageType:         &tmcons.Message{},
 		},
@@ -153,7 +153,7 @@ func (conR *Reactor) GetChannels() []*p2p.ChannelDescriptor {
 			ID: DataChannel, // maybe split between gossiping current block and catchup stuff
 			// once we gossip the whole block there's nothing left to send until next height or round
 			Priority:            10,
-			SendQueueCapacity:   100,
+			SendQueueCapacity:   10000,
 			RecvBufferCapacity:  50 * 4096,
 			RecvMessageCapacity: maxMsgSize,
 			MessageType:         &tmcons.Message{},
@@ -161,7 +161,7 @@ func (conR *Reactor) GetChannels() []*p2p.ChannelDescriptor {
 		{
 			ID:                  VoteChannel,
 			Priority:            7,
-			SendQueueCapacity:   100,
+			SendQueueCapacity:   10000,
 			RecvBufferCapacity:  100 * 100,
 			RecvMessageCapacity: maxMsgSize,
 			MessageType:         &tmcons.Message{},
@@ -169,7 +169,7 @@ func (conR *Reactor) GetChannels() []*p2p.ChannelDescriptor {
 		{
 			ID:                  VoteSetBitsChannel,
 			Priority:            1,
-			SendQueueCapacity:   2,
+			SendQueueCapacity:   2000,
 			RecvBufferCapacity:  1024,
 			RecvMessageCapacity: maxMsgSize,
 			MessageType:         &tmcons.Message{},
